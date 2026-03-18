@@ -1,0 +1,14 @@
+{
+  "chat.tools.urls.autoApprove": {
+    "https://dunst-project.org": {
+      "approveRequest": true,
+      "approveResponse": true
+    }
+  },
+  "chat.tools.terminal.autoApprove": {
+    "/^bash -n dictate\\.sh$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}
