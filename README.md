@@ -42,6 +42,7 @@ llm keys set groq
 Copy [`dictate.sh`](./dictate.sh) to `~/.local/bin` (or another directory you prefer).
 
 Configure a keyboard shortcut in your desktop environment to run `./dictate.sh toggle` (and optionally another one for `./dictate.sh cancel`).
+By default, transcripts are raw (no post-processing). To enable post-processing, pass the prompt at runtime with `./dictate.sh --prompt "your prompt" toggle`.
 
 For example, I use i3 and added the following lines to `~/.config/i3/config`:
 
@@ -53,7 +54,7 @@ bindsym $mod+Shift+backslash exec --no-startup-id ~/.local/bin/dictate.sh cancel
 ## Usage
 
 ```text
-Usage: dictate.sh <command>
+Usage: dictate.sh [--prompt "<prompt>"|--postprocess|--no-postprocess] <command>
 
 Commands:
   start   Start recording
@@ -61,4 +62,13 @@ Commands:
   cancel  Cancel recording
   toggle  Start if idle, stop if recording
   status  Show status (idle or working)
+
+Options:
+  --prompt <prompt>  Run transcript post-processing with the provided prompt
+  --postprocess     Enable transcript post-processing (prompt from env)
+  --no-postprocess  Disable transcript post-processing (default)
+
+Environment:
+  DICTATE_POSTPROCESS=0|1  Default post-processing mode (default: 0)
+  DICTATE_PROCESS_PROMPT    Prompt used when post-processing is enabled
 ```

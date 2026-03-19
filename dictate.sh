@@ -5,6 +5,8 @@ REC_FILE="$STATE_DIR/dictate.wav"
 REC_PIDFILE="$STATE_DIR/arecord.pid"
 WORKER_PIDFILE="$STATE_DIR/worker.pid"
 NOTIFY_IDFILE="$STATE_DIR/notification.id"
+POSTPROCESS_ENABLED="${DICTATE_POSTPROCESS:-0}"
+POSTPROCESS_PROMPT="${DICTATE_PROCESS_PROMPT:-}"
 
 mkdir -p "$STATE_DIR"
 
@@ -91,8 +93,19 @@ start() {
             sleep 0.1
         done
 
-        transcript="$(llm groq-whisper - < "$REC_FILE")"
-        if [ -n "$transcript" ]; then
+        raw_transcript="$(llm groq-whisper - < "$REC_FILE")"
+        if [ -n "$raw_transcript" ]; then
+            if [ "$POSTPROCESS_ENABLED" = "1" ] && [ -n "$POSTPROCESS_PROMPT" ]; then
+                # Post-process the raw transcript with punctuation, typo fixes and style tweaks.
+                if transcript="$(printf '%s' "$raw_transcript" | llm --system "$POSTPROCESS_PROMPT")"; then
+                    :
+                else
+                    transcript="$raw_transcript"
+                fi
+            else
+                transcript="$raw_transcript"
+            fi
+
             # Copy to both CLIPBOARD (modern apps) and PRIMARY (Unix terminals)
             printf '%s' "$transcript" | xclip -selection clipboard -in
             printf '%s' "$transcript" | xclip -selection primary -in
@@ -140,7 +153,7 @@ status() {
 
 usage() {
     cat <<'EOF'
-Usage: dictate.sh <command>
+Usage: dictate.sh [--prompt "<prompt>"|--postprocess|--no-postprocess] <command>
 
 Commands:
   start   Start recording
@@ -148,12 +161,60 @@ Commands:
   cancel  Cancel recording
   toggle  Start if idle, stop if recording
   status  Show status (idle or working)
+
+Options:
+    --prompt <prompt>  Run transcript post-processing with the provided prompt
+    --postprocess     Enable transcript post-processing (prompt from env)
+    --no-postprocess  Disable transcript post-processing (default)
+
+Environment:
+    DICTATE_POSTPROCESS=0|1  Default post-processing mode (default: 0)
+    DICTATE_PROCESS_PROMPT    Prompt used when post-processing is enabled
 EOF
 }
 
 require_deps
 
-case "${1:-}" in
+command=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        start|stop|cancel|toggle|status)
+            if [ -n "$command" ]; then
+                echo "Only one command can be provided" >&2
+                exit 1
+            fi
+            command="$1"
+            ;;
+        --postprocess)
+            POSTPROCESS_ENABLED="1"
+            ;;
+        --prompt)
+            if [ "$#" -lt 2 ]; then
+                echo "Missing prompt for --prompt" >&2
+                usage
+                exit 1
+            fi
+            POSTPROCESS_ENABLED="1"
+            POSTPROCESS_PROMPT="$2"
+            shift
+            ;;
+        --no-postprocess)
+            POSTPROCESS_ENABLED="0"
+            ;;
+        -h|--help|help)
+            command="help"
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+case "$command" in
     start)
         start
         ;;
@@ -169,7 +230,7 @@ case "${1:-}" in
     status)
         status
         ;;
-    ""|-h|--help|help)
+    ""|help)
         usage
         ;;
     *)
