@@ -10,6 +10,8 @@ There is no server, no daemon.
 
 Transcription is done by the OpenAI Whisper model via the remote [Groq API](https://groq.com/) (free tier available).
 
+See also: <https://github.com/cbenz/llm-text-transform>
+
 ## How it works
 
 First, the user configures a keyboard shortcut (e.g. `mod+backslash`) in their desktop environment to start and stop the recording, and another one (e.g. `mod+shift+backslash`) to cancel it.
@@ -42,7 +44,6 @@ llm keys set groq
 Copy [`llm-dictate`](./llm-dictate) to `~/.local/bin` (or another directory you prefer).
 
 Configure a keyboard shortcut in your desktop environment to run `./llm-dictate toggle` (and optionally another one for `./llm-dictate cancel`).
-By default, transcripts are raw (no post-processing). To enable post-processing, pass the prompt at runtime with `./llm-dictate --prompt "your prompt" toggle`.
 
 For example, I use i3 and added the following lines to `~/.config/i3/config`:
 
@@ -54,7 +55,7 @@ bindsym $mod+Shift+backslash exec --no-startup-id ~/.local/bin/llm-dictate cance
 ## Usage
 
 ```text
-Usage: llm-dictate [--prompt "<prompt>"|--postprocess|--no-postprocess] <command>
+Usage: llm-dictate <command>
 
 Commands:
   start   Start recording
@@ -62,13 +63,4 @@ Commands:
   cancel  Cancel recording
   toggle  Start if idle, stop if recording
   status  Show status (idle or working)
-
-Options:
-  --prompt <prompt>  Run transcript post-processing with the provided prompt
-  --postprocess     Enable transcript post-processing (prompt from env)
-  --no-postprocess  Disable transcript post-processing (default)
-
-Environment:
-  LLM_DICTATE_POSTPROCESS=0|1  Default post-processing mode (default: 0)
-  LLM_DICTATE_PROCESS_PROMPT   Prompt used when post-processing is enabled
 ```

@@ -5,8 +5,6 @@ REC_FILE="$STATE_DIR/llm-dictate.wav"
 REC_PIDFILE="$STATE_DIR/arecord.pid"
 WORKER_PIDFILE="$STATE_DIR/worker.pid"
 NOTIFY_IDFILE="$STATE_DIR/notification.id"
-POSTPROCESS_ENABLED="${LLM_DICTATE_POSTPROCESS:-${DICTATE_POSTPROCESS:-0}}"
-POSTPROCESS_PROMPT="${LLM_DICTATE_PROCESS_PROMPT:-${DICTATE_PROCESS_PROMPT:-}}"
 
 mkdir -p "$STATE_DIR"
 
@@ -102,9 +100,9 @@ start() {
     echo $! > "$REC_PIDFILE"
 
     (
-        local raw_transcript transcript
-        local transcribe_err_file postprocess_err_file
-        local transcribe_err_msg postprocess_err_msg
+        local transcript
+        local transcribe_err_file
+        local transcribe_err_msg
 
         # Wait for recording to finish
         while is_running_pidfile "$REC_PIDFILE"; do
@@ -113,22 +111,8 @@ start() {
 
         transcribe_err_file="$(mktemp "$STATE_DIR/transcribe.XXXXXX.err")"
 
-        if raw_transcript="$(llm groq-whisper - < "$REC_FILE" 2>"$transcribe_err_file")"; then
-            if [ -n "$raw_transcript" ]; then
-                if [ "$POSTPROCESS_ENABLED" = "1" ] && [ -n "$POSTPROCESS_PROMPT" ]; then
-                    postprocess_err_file="$(mktemp "$STATE_DIR/postprocess.XXXXXX.err")"
-                    # Post-process the raw transcript with punctuation, typo fixes and style tweaks.
-                    if transcript="$(printf '%s' "$raw_transcript" | llm prompt --system "$POSTPROCESS_PROMPT" - 2>"$postprocess_err_file")"; then
-                        :
-                    else
-                        postprocess_err_msg="$(format_error_message "$(cat "$postprocess_err_file")")"
-                        notify "❌ Post-process failed: $postprocess_err_msg" 6000
-                        transcript="$raw_transcript"
-                    fi
-                    rm -f "$postprocess_err_file"
-                else
-                    transcript="$raw_transcript"
-                fi
+        if transcript="$(llm groq-whisper - < "$REC_FILE" 2>"$transcribe_err_file")"; then
+            if [ -n "$transcript" ]; then
 
                 # Copy to both CLIPBOARD (modern apps) and PRIMARY (Unix terminals)
                 printf '%s' "$transcript" | xclip -selection clipboard -in
@@ -183,7 +167,7 @@ status() {
 
 usage() {
     cat <<'EOF'
-Usage: llm-dictate [--prompt "<prompt>"|--postprocess|--no-postprocess] <command>
+Usage: llm-dictate <command>
 
 Commands:
   start   Start recording
@@ -191,15 +175,6 @@ Commands:
   cancel  Cancel recording
   toggle  Start if idle, stop if recording
   status  Show status (idle or working)
-
-Options:
-    --prompt <prompt>  Run transcript post-processing with the provided prompt
-    --postprocess     Enable transcript post-processing (prompt from env)
-    --no-postprocess  Disable transcript post-processing (default)
-
-Environment:
-    LLM_DICTATE_POSTPROCESS=0|1  Default post-processing mode (default: 0)
-    LLM_DICTATE_PROCESS_PROMPT   Prompt used when post-processing is enabled
 EOF
 }
 
@@ -215,22 +190,6 @@ while [ "$#" -gt 0 ]; do
                 exit 1
             fi
             command="$1"
-            ;;
-        --postprocess)
-            POSTPROCESS_ENABLED="1"
-            ;;
-        --prompt)
-            if [ "$#" -lt 2 ]; then
-                echo "Missing prompt for --prompt" >&2
-                usage
-                exit 1
-            fi
-            POSTPROCESS_ENABLED="1"
-            POSTPROCESS_PROMPT="$2"
-            shift
-            ;;
-        --no-postprocess)
-            POSTPROCESS_ENABLED="0"
             ;;
         -h|--help|help)
             command="help"
