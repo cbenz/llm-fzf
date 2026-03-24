@@ -45,6 +45,9 @@ kill_from_pidfile() {
 }
 
 stop_spinner_with_pidfile() {
+    if [ -z "${SPINNER_PID:-}" ] && [ -f "$SPINNER_PIDFILE" ]; then
+        SPINNER_PID="$(cat "$SPINNER_PIDFILE")"
+    fi
     stop_spinner
     rm -f "$SPINNER_PIDFILE"
 }
@@ -115,8 +118,8 @@ cancel() {
         return 0
     fi
 
-    kill_from_pidfile "$REC_PIDFILE" -INT
     kill_from_pidfile "$WORKER_PIDFILE" -TERM
+    kill_from_pidfile "$REC_PIDFILE" -INT
     stop_spinner_with_pidfile
     notify_message "🛑 Recording cancelled" 1000
 }
