@@ -4,6 +4,7 @@ STATE_DIR="${XDG_RUNTIME_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}}/llm-dictate
 REC_FILE="$STATE_DIR/llm-dictate.wav"
 REC_PIDFILE="$STATE_DIR/arecord.pid"
 WORKER_PIDFILE="$STATE_DIR/worker.pid"
+SPINNER_PIDFILE="$STATE_DIR/spinner.pid"
 NOTIFY_IDFILE="$STATE_DIR/notification.id"
 
 mkdir -p "$STATE_DIR"
@@ -39,6 +40,29 @@ notify() {
 
     notify_id="$(dunstify "${args[@]}" "$message")" || return
     printf '%s' "$notify_id" > "$NOTIFY_IDFILE"
+}
+
+start_spinner() {
+    local label="$1"
+
+    stop_spinner
+
+    (
+        local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+        local i=0
+
+        while true; do
+            notify "$label ${frames[$i]}"
+            i=$(( (i + 1) % ${#frames[@]} ))
+            sleep 0.15
+        done
+    ) &
+
+    echo $! > "$SPINNER_PIDFILE"
+}
+
+stop_spinner() {
+    kill_from_pidfile "$SPINNER_PIDFILE" -TERM
 }
 
 close_notification() {
@@ -94,7 +118,7 @@ kill_from_pidfile() {
 start() {
     rm -f "$REC_FILE"
 
-    notify "🎤 Recording..."
+    start_spinner "🎤 Recording"
 
     arecord -f S16_LE -r 16000 -c 1 -t wav "$REC_FILE" &
     echo $! > "$REC_PIDFILE"
@@ -103,11 +127,14 @@ start() {
         local transcript
         local transcribe_err_file
         local transcribe_err_msg
+        local had_error=0
 
         # Wait for recording to finish
         while is_running_pidfile "$REC_PIDFILE"; do
             sleep 0.1
         done
+
+        start_spinner "⏳ Transcribing"
 
         transcribe_err_file="$(mktemp "$STATE_DIR/transcribe.XXXXXX.err")"
 
@@ -120,12 +147,17 @@ start() {
                 xdotool key --clearmodifiers Shift+Insert
             fi
         else
+            had_error=1
+            stop_spinner
             transcribe_err_msg="$(format_error_message "$(cat "$transcribe_err_file")")"
             notify "❌ Transcription failed: $transcribe_err_msg" 6000
         fi
 
         rm -f "$transcribe_err_file"
-        close_notification
+        stop_spinner
+        if [ "$had_error" -eq 0 ]; then
+            close_notification
+        fi
         rm -f "$WORKER_PIDFILE"
     ) &
     echo $! > "$WORKER_PIDFILE"
@@ -134,7 +166,6 @@ start() {
 stop() {
     if recording_active; then
         kill_from_pidfile "$REC_PIDFILE" -INT
-        notify "⏳ Transcribing..."
     fi
 }
 
@@ -146,6 +177,7 @@ cancel() {
 
     kill_from_pidfile "$REC_PIDFILE" -INT
     kill_from_pidfile "$WORKER_PIDFILE" -TERM
+    stop_spinner
     notify "🛑 Recording cancelled" 1000
 }
 
