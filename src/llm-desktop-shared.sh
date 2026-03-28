@@ -152,3 +152,20 @@ clipboard_write_both() {
     clipboard_write_clipboard "$value"
     clipboard_write_primary "$value"
 }
+
+clipboard_paste_via_shift_insert() {
+    local value="$1"
+    local hold_delay="${LLM_SHIFT_INSERT_HOLD_DELAY_SEC:-0.04}"
+    local key_status=0
+
+    clipboard_write_both "$value"
+
+    # Hold Shift briefly before and after Insert to avoid occasional plain Insert.
+    xdotool keydown Shift || return 1
+    sleep "$hold_delay"
+    xdotool key Insert || key_status=$?
+    sleep "$hold_delay"
+    xdotool keyup Shift || true
+
+    return "$key_status"
+}

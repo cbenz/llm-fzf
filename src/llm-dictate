@@ -91,10 +91,7 @@ start() {
 
         if transcript="$(llm groq-whisper - < "$REC_FILE" 2>"$transcribe_err_file")"; then
             if [ -n "$transcript" ]; then
-
-                # Copy to both CLIPBOARD (modern apps) and PRIMARY (classic Unix apps)
-                clipboard_write_both "$transcript"
-                xdotool key --clearmodifiers Shift+Insert
+                clipboard_paste_via_shift_insert "$transcript"
             fi
         else
             had_error=1

@@ -14,7 +14,7 @@ mkdir -p "$STATE_DIR"
 source "$SCRIPT_DIR/llm-desktop-shared.sh"
 notify_init "llm-text-transform" "$NOTIFY_IDFILE"
 
-if ! require_commands llm dunstify flock find sed sort cat xterm fzf; then
+if ! require_commands llm dunstify flock find sed sort cat xterm fzf xdotool; then
   notify_message "❌ Missing dependencies" 5000 || true
   exit 1
 fi
@@ -69,8 +69,8 @@ exec 9>&-
 $INPUT_TEXT
 </text>")"; then
     stop_spinner
-    clipboard_write_clipboard "$RESULT"
-    notify_message "✅ Copied result to clipboard" 1500 || true
+    clipboard_paste_via_shift_insert "$RESULT"
+    notify_message "✅ Result pasted" 1500 || true
     sleep 1.5
     close_notification
   else
